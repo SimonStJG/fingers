@@ -22,13 +22,10 @@ TARGET_IMAGE_SIZE = 32
 BATCH_SIZE = 50
 STEPS_PER_EPOCH = 2000  # 2000
 EPOCHS = 25  # 50
-VALIDATION_STEPS=16   # 800
+VALIDATION_STEPS=100   # 800
 
 
 NUM_CLASSES = 6
-
-# TODO
-# * Reintroduce negatives!
 
 class UserRecoverableException(Exception):
   def __init__(self, message, cause):
@@ -170,7 +167,15 @@ def main():
         vertical_flip=True,
         rescale=1./255)  # For unknown reasons, this defaults to 256x256.
 
-  # test_datagen = ImageDataGenerator(rescale=1./255)
+  # Ideally, we wouldn't bother with any of this shear, zoom, rotation, etc, but we've not got many images.
+  test_datagen = ImageDataGenerator(
+        shear_range=0.2,
+        zoom_range=0.2,
+        rotation_range=360,
+        # channel_shift_range=0,
+        horizontal_flip=True,
+        vertical_flip=True,
+        rescale=1./255)
 
   train_generator = train_datagen.flow_from_directory(
         'data',
@@ -178,11 +183,11 @@ def main():
         # class_mode='binary',   # since we use binary_crossentropy loss, we need binary labels
         target_size=(TARGET_IMAGE_SIZE, TARGET_IMAGE_SIZE))
 
-  # validation_generator = test_datagen.flow_from_directory(
-  #       'validation',
-  #       batch_size=BATCH_SIZE,
-  #       # class_mode='binary',
-  #       target_size=(TARGET_IMAGE_SIZE, TARGET_IMAGE_SIZE))
+  validation_generator = test_datagen.flow_from_directory(
+        'validation',
+        batch_size=BATCH_SIZE,
+        # class_mode='binary',
+        target_size=(TARGET_IMAGE_SIZE, TARGET_IMAGE_SIZE))
 
   print("Defining model...")
 
@@ -193,9 +198,9 @@ def main():
   model.fit_generator(
           train_generator,
           steps_per_epoch=STEPS_PER_EPOCH // BATCH_SIZE,
-          epochs=EPOCHS)
-          # validation_data=validation_generator,
-          # validation_steps=VALIDATION_STEPS // BATCH_SIZE)
+          epochs=EPOCHS,
+          validation_data=validation_generator,
+          validation_steps=VALIDATION_STEPS // BATCH_SIZE)
 
   # model.save_weights('first_try.h5')  # always save your weights after training or during training
 
