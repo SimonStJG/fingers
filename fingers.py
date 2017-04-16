@@ -15,16 +15,19 @@ from io import BytesIO
 # We need this for save_labels, better to fail early
 import h5py
 
-SKIP_RESIZE_AND_CROP = True
+SKIP_RESIZE_AND_CROP = False
 
 TARGET_IMAGE_SIZE = 50
 
 BATCH_SIZE = 16
 STEPS_PER_EPOCH = 1000  # 2000
-EPOCHS = 2  # 50
+EPOCHS = 5  # 50
 VALIDATION_STEPS=16   # 800
 
 NUM_CLASSES = 6
+
+# TODO
+# * Reintroduce negatives!
 
 class UserRecoverableException(Exception):
   def __init__(self, message, cause):
@@ -87,7 +90,7 @@ def clean_target_directories(target_dir, negative_target_dir):
   if os.path.exists(target_dir):
     shutil.rmtree(target_dir)
   os.mkdir(target_dir)
-  os.mkdir(negative_target_dir)
+  # os.mkdir(negative_target_dir)
   for i in range(0, 6):
     os.mkdir(os.path.join(target_dir, str(i)))
 
@@ -135,7 +138,7 @@ def main():
   negative_source_dir = os.path.join(source_dir, "101_ObjectCategories")
   positive_source_dir = os.path.join(source_dir, "positives")
 
-  retrieve_caltech_database(negative_source_dir)
+  # retrieve_caltech_database(negative_source_dir)
 
   target_dir = os.path.join(root_dir, "data")
   negative_target_dir = os.path.join(target_dir, "negatives")
@@ -145,10 +148,10 @@ def main():
     print("Skipping resize and crop, leaving data directory intact")
   else:
     clean_target_directories(target_dir, negative_target_dir)
-    print("Running resize and crop on negatives...")
-    resize_and_crop(source=negative_source_dir,
-                    target=lambda dir_name, filename: os.path.join(negative_target_dir,
-                                                                  "{}_{}".format(os.path.split(dir_name)[-1], filename)))
+    # print("Running resize and crop on negatives...")
+    # resize_and_crop(source=negative_source_dir,
+    #                 target=lambda dir_name, filename: os.path.join(negative_target_dir,
+    #                                                               "{}_{}".format(os.path.split(dir_name)[-1], filename)))
     print("Running resize and crop on positives...")
     resize_and_crop(source=positive_source_dir,
                     target=lambda dir_name, filename: os.path.join(target_dir,
@@ -166,7 +169,7 @@ def main():
         vertical_flip=True,
         rescale=1./255)  # For unknown reasons, this defaults to 256x256.
 
-  test_datagen = ImageDataGenerator(rescale=1./255)
+  # test_datagen = ImageDataGenerator(rescale=1./255)
 
   train_generator = train_datagen.flow_from_directory(
         'data',
@@ -174,11 +177,11 @@ def main():
         # class_mode='binary',   # since we use binary_crossentropy loss, we need binary labels
         target_size=(TARGET_IMAGE_SIZE, TARGET_IMAGE_SIZE))
 
-  validation_generator = test_datagen.flow_from_directory(
-        'validation',
-        batch_size=BATCH_SIZE,
-        # class_mode='binary',
-        target_size=(TARGET_IMAGE_SIZE, TARGET_IMAGE_SIZE))
+  # validation_generator = test_datagen.flow_from_directory(
+  #       'validation',
+  #       batch_size=BATCH_SIZE,
+  #       # class_mode='binary',
+  #       target_size=(TARGET_IMAGE_SIZE, TARGET_IMAGE_SIZE))
 
   print("Defining model...")
 
@@ -189,9 +192,9 @@ def main():
   model.fit_generator(
           train_generator,
           steps_per_epoch=STEPS_PER_EPOCH // BATCH_SIZE,
-          epochs=EPOCHS,
-          validation_data=validation_generator,
-          validation_steps=VALIDATION_STEPS // BATCH_SIZE)
+          epochs=EPOCHS)
+          # validation_data=validation_generator,
+          # validation_steps=VALIDATION_STEPS // BATCH_SIZE)
 
   # model.save_weights('first_try.h5')  # always save your weights after training or during training
 
