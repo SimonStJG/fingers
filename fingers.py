@@ -15,13 +15,13 @@ from io import BytesIO
 # We need this for save_labels, better to fail early
 import h5py
 
-SKIP_RESIZE_AND_CROP = False
+SKIP_RESIZE_AND_CROP = True
 
-TARGET_IMAGE_SIZE = 50
+TARGET_IMAGE_SIZE = 150
 
 BATCH_SIZE = 16
 STEPS_PER_EPOCH = 1000  # 2000
-EPOCHS = 5  # 50
+EPOCHS = 2  # 50
 VALIDATION_STEPS=16   # 800
 
 NUM_CLASSES = 6
