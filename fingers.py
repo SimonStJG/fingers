@@ -12,11 +12,19 @@ from keras.models import Sequential
 from keras.preprocessing.image import ImageDataGenerator
 from io import BytesIO
 
+# We need this for save_labels, better to fail early
+import h5py
 
 SKIP_RESIZE_AND_CROP = True
 
 TARGET_IMAGE_SIZE = 50
 
+BATCH_SIZE = 16
+STEPS_PER_EPOCH = 1000  # 2000
+EPOCHS = 2  # 50
+VALIDATION_STEPS=16   # 800
+
+NUM_CLASSES = 6
 
 class UserRecoverableException(Exception):
   def __init__(self, message, cause):
@@ -83,6 +91,41 @@ def clean_target_directories(target_dir, negative_target_dir):
   for i in range(0, 6):
     os.mkdir(os.path.join(target_dir, str(i)))
 
+def build_model():
+  model = Sequential()
+
+  model.add(Conv2D(32, (3, 3), # padding='same',
+                   input_shape=(TARGET_IMAGE_SIZE, TARGET_IMAGE_SIZE, 3)))
+  model.add(Activation('relu'))
+  model.add(Conv2D(32, (3, 3)))
+  model.add(Activation('relu'))
+  model.add(MaxPooling2D(pool_size=(2, 2)))
+  model.add(Dropout(0.25))
+
+  model.add(Conv2D(64, (3, 3), padding='same'))
+  model.add(Activation('relu'))
+  model.add(Conv2D(64, (3, 3)))
+  model.add(Activation('relu'))
+  model.add(MaxPooling2D(pool_size=(2, 2)))
+  model.add(Dropout(0.25))
+
+  model.add(Flatten())
+  model.add(Dense(512))
+  model.add(Activation('relu'))
+  model.add(Dropout(0.5))
+  model.add(Dense(NUM_CLASSES))
+  model.add(Activation('softmax'))
+
+  # initiate RMSprop optimizer
+  opt = keras.optimizers.rmsprop(lr=0.0001, decay=1e-6)
+
+  # Let's train the model using RMSprop
+  model.compile(loss='categorical_crossentropy',
+                optimizer=opt,
+                metrics=['accuracy'])
+
+  return model
+
 def main():
   print("Every bit of this is going to eat your CPU, be prepared.")
 
@@ -114,8 +157,6 @@ def main():
 
   print("Defining data generators...")
 
-  batch_size = 16
-
   train_datagen = ImageDataGenerator(
         shear_range=0.2,
         zoom_range=0.2,
@@ -123,59 +164,36 @@ def main():
         # channel_shift_range=0,
         horizontal_flip=True,
         vertical_flip=True,
-        rescale=1./255)
+        rescale=1./255)  # For unknown reasons, this defaults to 256x256.
 
   test_datagen = ImageDataGenerator(rescale=1./255)
 
   train_generator = train_datagen.flow_from_directory(
-        'data',  # this is the target directory
-        batch_size=batch_size,
-        class_mode='binary')  # since we use binary_crossentropy loss, we need binary labels
+        'data',
+        batch_size=BATCH_SIZE,
+        # class_mode='binary',   # since we use binary_crossentropy loss, we need binary labels
+        target_size=(TARGET_IMAGE_SIZE, TARGET_IMAGE_SIZE))
 
-  # this is a similar generator, for validation data
   validation_generator = test_datagen.flow_from_directory(
         'validation',
-        batch_size=batch_size,
-        class_mode='binary')
+        batch_size=BATCH_SIZE,
+        # class_mode='binary',
+        target_size=(TARGET_IMAGE_SIZE, TARGET_IMAGE_SIZE))
 
   print("Defining model...")
 
-  model = Sequential()
-  model.add(Conv2D(32, (3, 3), input_shape=(3, TARGET_IMAGE_SIZE, TARGET_IMAGE_SIZEs)))
-  model.add(Activation('relu'))
-  model.add(MaxPooling2D(pool_size=(2, 2)))
-
-  model.add(Conv2D(32, (3, 3)))
-  model.add(Activation('relu'))
-  model.add(MaxPooling2D(pool_size=(2, 2)))
-
-  model.add(Conv2D(64, (3, 3)))
-  model.add(Activation('relu'))
-  model.add(MaxPooling2D(pool_size=(2, 2)))
-
-  model.add(Flatten())  # this converts our 3D feature maps to 1D feature vectors
-  model.add(Dense(64))
-  model.add(Activation('relu'))
-  model.add(Dropout(0.5))
-  model.add(Dense(1))
-  model.add(Activation('sigmoid'))
-
-  model.compile(loss='binary_crossentropy',
-                optimizer='rmsprop',
-                metrics=['accuracy'])
+  model = build_model()
 
   print("Fitting model...")
 
   model.fit_generator(
           train_generator,
-          steps_per_epoch=2000 // batch_size,
-          epochs=50,
+          steps_per_epoch=STEPS_PER_EPOCH // BATCH_SIZE,
+          epochs=EPOCHS,
           validation_data=validation_generator,
-          validation_steps=800 // batch_size)
+          validation_steps=VALIDATION_STEPS // BATCH_SIZE)
 
-  model.save_weights('first_try.h5')  # always save your weights after training or during training
-
-
+  # model.save_weights('first_try.h5')  # always save your weights after training or during training
 
 
 if __name__ == "__main__":
